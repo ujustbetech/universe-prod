@@ -1,3 +1,5 @@
+// changes into index homepage
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { db } from '../firebaseConfig';
