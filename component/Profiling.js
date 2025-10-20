@@ -617,7 +617,7 @@ if (field === 'BusinessSocialMediaPages') {
             <li className="form-row">
               <h4>Mobile</h4>
               <div className="multipleitem">
-                <input type="text" value={formData['Mobile no'] || formData.Mobile || ''} readOnly />
+                <input type="text" value={formData['MobileNo'] || formData.Mobile || ''} readOnly />
               </div>
             </li>
 

@@ -106,7 +106,7 @@ useEffect(() => {
     "DOB": formattedDOB,
     "Email": newUser.email,
     "Gender": newUser.gender,
-    "UJB Code": newUser.ujbCode,
+    "UJBCode": newUser.ujbCode,
     "Mentor Name": mentorName,
     "Mentor Phone": mentorPhone,
     "Mentor UJB Code": mentorUjbCode,
