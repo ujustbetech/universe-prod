@@ -600,12 +600,22 @@ if (field === 'BusinessSocialMediaPages') {
               </div>
             </li>
 
-            <li className="form-row">
-              <h4>Category</h4>
-              <div className="multipleitem">
-                <input type="text" value={formData.Category || ''} readOnly />
-              </div>
-            </li>
+      
+         <li className="form-row">
+  <h4>Category</h4>
+  <div className="multipleitem">
+    <select
+      name="Category"
+      value={formData.Category || ''}
+      onChange={handleChange}
+      required
+    >
+      <option value="">Select Category</option>
+      <option value="Orbiter">Orbiter</option>
+      <option value="CosmOrbiter">CosmOrbiter</option>
+    </select>
+  </div>
+</li>
 
             <li className="form-row">
               <h4>Email</h4>
