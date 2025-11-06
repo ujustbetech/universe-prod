@@ -15,6 +15,7 @@ import { CiImageOff } from "react-icons/ci";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import Headertop from "../../component/Header";
+import { COLLECTIONS } from "/utility_collection";
 import toast from "react-hot-toast";
 const db = getFirestore(app);
 
@@ -71,12 +72,12 @@ const ReferralDetails = () => {
       if (snap.exists()) {
         const data = snap.data();
         setOrbiterDetails({
-          name: data[" Name"] || "",
+          name: data["Name"] || "",
           email: data.Email || "",
-          phone: data["Mobile no"] || "",
-          ujbCode: data["UJB Code"] || "",
-          mentorName: data["Mentor Name"] || "",
-          mentorPhone: data["Mentor Phone"] || "",
+          phone: data["MobileNo"] || "",
+          ujbCode: data["UJBCode"] || "",
+          mentorName: data["MentorName"] || "",
+          mentorPhone: data["MentorPhone"] || "",
         });
       }
     };
@@ -88,21 +89,21 @@ const ReferralDetails = () => {
     if (!id) return;
 
     const fetchCosmo = async () => {
-      const snap = await getDoc(doc(db, "userdetail", id));
+      const snap = await getDoc(doc(db, COLLECTIONS.userDetail, id));
       if (snap.exists()) {
         const data = snap.data();
         console.log("orbiter data", data);
 
         setUserDetails({
-          name: data[" Name"] || "",
+          name: data["Name"] || "",
           email: data.Email || "",
-          phone: data["Mobile no"] || "",
-          businessName: data["Business Name"] || "N/A",
-          businessDetails: data["Business History"] || "N/A",
-          tagline: data["Tag Line"] || "",
-          logo: data["Business Logo"] || "",
-          profilePic: data["Profile Photo URL"] || "",
-          ujbCode: data["UJB Code"] || "",
+          phone: data["MobileNo"] || "",
+          businessName: data["BusinessName"] || "N/A",
+          businessDetails: data["BusinessHistory"] || "N/A",
+          tagline: data["TagLine"] || "",
+          logo: data["BusinessLogo"] || "",
+          profilePic: data["ProfilePhotoURL"] || "",
+          ujbCode: data["UJBCode"] || "",
           businessType: data["Business Details (Nature & Type)"] || "",
           Locality: data.Locality || "",
           City: data.City || "",
@@ -111,8 +112,8 @@ const ReferralDetails = () => {
           products: Array.isArray(data.products) ? data.products : [],
           // ✅ New fields
           category: data.Category || '',
-          category1: data['Category 1'] || '',
-          category2: data['Category 2'] || '',
+          category1: data['Category1'] || '',
+          category2: data['Category2'] || '',
         });
         setServices(Array.isArray(data.services) ? data.services : []);
         setProducts(Array.isArray(data.products) ? data.products : []);
@@ -129,7 +130,7 @@ const generateReferralId = async () => {
 
   try {
     // Fetch the latest referral document (ordered by timestamp)
-    const q = query(collection(db, "Referral"), orderBy("timestamp", "desc"), limit(1));
+    const q = query(collection(db, COLLECTIONS.referral), orderBy("timestamp", "desc"), limit(1));
     const snapshot = await getDocs(q);
 
     let lastNum = 2999; // Start base number (Ref/25-26/00003000)
@@ -217,7 +218,7 @@ const handlePassReferral = async () => {
       statusLogs: [],
     };
 
-    await addDoc(collection(db, "Referral"), data);
+    await addDoc(collection(db,COLLECTIONS.referral), data);
 
     // Determine service or product name
     const serviceOrProduct = selectedService?.name || selectedProduct?.name || "";

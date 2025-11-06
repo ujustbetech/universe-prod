@@ -1,13 +1,32 @@
 import React, { useRef } from "react";
 import { db } from "../firebaseConfig";
-import { doc, setDoc } from "firebase/firestore";
+import { collection, doc, setDoc, Timestamp } from "firebase/firestore";
 import * as XLSX from "xlsx";
 
-export default function ImportUsers() {
+export default function ImportReferrals() {
   const fileInputRef = useRef();
 
-  const handleFileSelect = () => {
-    fileInputRef.current.click();
+  const handleFileSelect = () => fileInputRef.current.click();
+
+  // Function to safely parse Excel date values
+  const parseExcelDate = (value) => {
+    if (!value) return Timestamp.now();
+
+    // If it's already a Date object
+    if (value instanceof Date && !isNaN(value)) return Timestamp.fromDate(value);
+
+    // If it's a number (Excel serial date)
+    if (typeof value === "number") {
+      const excelEpoch = new Date(1899, 11, 30);
+      return Timestamp.fromDate(new Date(excelEpoch.getTime() + value * 86400000));
+    }
+
+    // If it's a string
+    const parsed = new Date(value);
+    if (!isNaN(parsed)) return Timestamp.fromDate(parsed);
+
+    // Fallback to now
+    return Timestamp.now();
   };
 
   const handleImport = async (e) => {
@@ -26,172 +45,64 @@ export default function ImportUsers() {
         return;
       }
 
-      const headers = Object.keys(jsonData[0]);
-      const ujbCodeHeader = headers.find(
-        (h) => h.toLowerCase().replace(/\s/g, "") === "ujbcode"
-      );
-      if (!ujbCodeHeader) {
-        alert("❌ Cannot find a UJB Code column in Excel!");
-        console.log("Headers found:", headers);
-        return;
-      }
-
       let importedCount = 0;
 
       for (const row of jsonData) {
-        const ujbCode = row[ujbCodeHeader]?.toString().trim();
-        if (!ujbCode) continue;
+        const referralGivenDate = parseExcelDate(row["Referral Given date"]);
 
-        const category = row["Category"]?.trim() || "";
-
-        const services = [];
-        const products = [];
-        const connects = [];
-        const contributionAreas = [];
-        const skills = [];
-
-        // Contribution Areas
-        if (row["Contribution Area in UJustBe"]) {
-          contributionAreas.push(
-            ...row["Contribution Area in UJustBe"]
-              .split(",")
-              .map((a) => a.trim())
-              .filter((a) => a)
-          );
-        }
-
-        // Skills
-        if (row["Skills"]) {
-          skills.push(
-            ...row["Skills"]
-              .split(",")
-              .map((s) => s.trim())
-              .filter((s) => s)
-          );
-        }
-
-        // Parse connects
-        Object.keys(row).forEach((key) => {
-          if (key.startsWith("Connect") && row[key] && row[key] !== "—") {
-            const match = row[key].match(
-              /Name:\s*(.*?),\s*Phone:\s*(.*?),\s*Email:\s*(.*?),\s*UJBCode:\s*(.*)?/
-            );
-            if (match) {
-              connects.push({
-                name: match[1]?.trim(),
-                phone: match[2]?.trim(),
-                email: match[3]?.trim(),
-                ujbCode: match[4]?.trim() || "", // ujbCode may be missing
-              });
-            }
-          }
-        });
-
-        // Parse services (with keywords)
-        Object.keys(row).forEach((key) => {
-          if (key.startsWith("Service") && row[key] && row[key] !== "—") {
-            const match = row[key].match(
-              /Name:\s*(.*?),\s*Description:\s*(.*?),\s*Keywords:\s*(.*?),\s*Image:\s*(.*?),\s*%:\s*(.*)/
-            );
-            if (match) {
-              services.push({
-                name: match[1]?.trim(),
-                description: match[2]?.trim(),
-                keywords: match[3]?.trim(),
-                imageURL: match[4]?.trim(),
-                percentage: match[5]?.trim(),
-              });
-            }
-          }
-        });
-
-        // Parse products (with keywords)
-        Object.keys(row).forEach((key) => {
-          if (key.startsWith("Product") && row[key] && row[key] !== "—") {
-            const match = row[key].match(
-              /Name:\s*(.*?),\s*Description:\s*(.*?),\s*Keywords:\s*(.*?),\s*Image:\s*(.*?),\s*%:\s*(.*)/
-            );
-            if (match) {
-              products.push({
-                name: match[1]?.trim(),
-                description: match[2]?.trim(),
-                keywords: match[3]?.trim(),
-                imageURL: match[4]?.trim(),
-                percentage: match[5]?.trim(),
-              });
-            }
-          }
-        });
-
-        // Base user object
-        const userObj = {
-          Name: row["Name"] || "",
-          Address: row["Address"] || "",
-          AreaOfServices: row["AreaOfServices"] || "",
-          Aspirations: row["Aspirations"] || "",
-          Category: category,
-          Category1: row["Category1"] || "",
-          Category2: row["Category2"] || "",
-          City: row["City"] || "",
-          ClienteleBase: row["ClienteleBase"] || "",
-          ContributionAreaInUJustBe: contributionAreas,
-          CurrentHealthCondition: row["CurrentHealthCondition"] || "",
-          CurrentProfession: row["CurrentProfession"] || "",
-          DOB: row["DOB"] || "",
-          EducationalBackground: row["EducationalBackground"] || "",
-          Email: row["Email"] || "",
-          ExclusiveKnowledge: row["ExclusiveKnowledge"] || "",
-          FamilyHistorySummary: row["FamilyHistorySummary"] || "",
-          Gender: row["Gender"] || "",
-          HealthParameters: row["HealthParameters"] || "",
-          Hobbies: row["Hobbies"] || "",
-          IDNumber: row["IDNumber"] || "",
-          IDType: row["IDType"] || "",
-          ImmediateDesire: row["ImmediateDesire"] || "",
-          InterestArea: row["InterestArea"] || "",
-          LanguagesKnown: row["LanguagesKnown"] || "",
-          Locality: row["Locality"] || "",
-          Location: row["Location"] || "",
-          MaritalStatus: row["MaritalStatus"] || "",
-          Mastery: row["Mastery"] || "",
-          MentorName: row["MentorName"] || "",
-          MentorPhone: row["MentorPhone"] || "",
-          MentorUJBCode: row["MentorUJBCode"] || "",
-          MobileNo: row["MobileNo"] || "",
-          NoteworthyAchievements: row["NoteworthyAchievements"] || "",
-          ProfessionalHistory: row["ProfessionalHistory"] || "",
-          ProfilePhotoURL: row["ProfilePhotoURL"] || "",
-          ProfileStatus: row["ProfileStatus"] || "",
-          Skills: skills,
-          SpecialSocialContribution: row["SpecialSocialContribution"] || "",
-          State: row["State"] || "",
-          TagLine: row["TagLine"] || "",
-          UJBCode: ujbCode,
-          USP: row["USP"] || "",
-          Website: row["Website"] || "",
+        // CosmoOrbiter map
+        const cosmoOrbiter = {
+          name: row["CosmOrbiter Name"] || "",
+          email: row["CosmOrbiter personal  Email"] || "",
+          phone: (row["CosmOrbiter  Mobile number"] || "").toString(),
+          mentorName: row["CosmOrbiter mentorbiter Name"] || null,
+          mentorEmail: row["CosmOrbiter MentOrbiter Email ID"] || null,
+          mentorPhone: row["CosmOrbiter MentOrbiter Contact No"] || null,
+          dealStatus: row["Referral/Deal Status"] || "Pending",
+          lastUpdated: Timestamp.now(),
         };
 
-        // Only include business/services/products/connects if not Orbiter
-        if (category.toLowerCase() !== "orbiter") {
-          userObj.BusinessDetails = row["BusinessDetails"] || "";
-          userObj.BusinessEmailID = row["BusinessEmailID"] || "";
-          userObj.BusinessHistory = row["BusinessHistory"] || "";
-          userObj.BusinessLogo = row["BusinessLogo"] || "";
-          userObj.BusinessName = row["BusinessName"] || "";
-          userObj.BusinessSocialMediaPages = row["BusinessSocialMediaPages"] || "";
-          userObj.services = services;
-          userObj.products = products;
-          userObj.connects = connects;
-        }
+        // Orbiter map
+        const orbiter = {
+          name: row["Orbiter Name"] || "",
+          email: row["Orbiter Email"] || "",
+          phone: (row["Orbiter Mobile number"] || "").toString().replace("+91", "").trim(),
+          ujbCode: row["Orbiter_ujbCode"] || "",
+          mentorName: row["Orbiter MentOrbiter Name"] || null,
+          mentorEmail: row["Orbiter MentOrbiter Email"] || null,
+          mentorPhone: row["Orbiter MentOrbiter Mobile number"] || null,
+          orbitersInfo: null,
+        };
 
-        await setDoc(doc(db, "usersdetail", ujbCode), userObj);
+        // Product/service map
+        const product = {
+          name: row["Product/Service Name"] || "",
+          description: row["Product Description"] || "",
+          imageURL: row["Product Image URL"] || "",
+          percentage: row["Agreed Percentage/ amount"] || "",
+        };
+
+        // Main referral document
+        const referralDoc = {
+          referralId: row["Referral Id"] || "",
+          referralSource: row["referralSource"] || "",
+          referralType: row["referralType"] || "Self",
+          timestamp: referralGivenDate,
+          cosmoOrbiter,
+          orbiter,
+          product,
+        };
+
+        // Save with auto-generated doc ID in Referral_dev
+        const docRef = doc(collection(db, "Referraldev"));
+        await setDoc(docRef, referralDoc);
         importedCount++;
       }
 
-      alert(`✅ ${importedCount} Users imported successfully!`);
+      alert(`✅ ${importedCount} referrals imported successfully!`);
     } catch (error) {
-      console.error("❌ Error importing users:", error);
-      alert("❌ Failed to import users. Check console.");
+      console.error("❌ Error importing referrals:", error);
+      alert("❌ Failed to import referrals. Check console.");
     }
   };
 

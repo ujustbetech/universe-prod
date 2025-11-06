@@ -1,5 +1,3 @@
-// changes into index homepage
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { db } from '../firebaseConfig';
@@ -10,6 +8,7 @@ import SummaryCard from '../component/SummaryCard';
 import MeetingCard from '../component/MeetingCard';
 import HeaderNav from '../component/HeaderNav';
 import '../src/app/styles/user.scss';
+import { COLLECTIONS } from "/utility_collection";
 
 const HomePage = () => {
   const router = useRouter();
@@ -40,7 +39,7 @@ const HomePage = () => {
 
   const fetchUserName = async (phone) => {
     try {
-      const userRef = doc(db, 'userdetails', phone);
+      const userRef = doc(db, COLLECTIONS.userDetail, phone);
       const userDoc = await getDoc(userRef);
       const name = userDoc.exists() ? userDoc.data()[" Name"] || 'User' : 'User';
       setUserName(name);
@@ -55,7 +54,7 @@ const HomePage = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const docRef = doc(db, "userdetails", phoneNumber);
+      const docRef = doc(db, COLLECTIONS.userDetail, phoneNumber);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -98,7 +97,7 @@ const HomePage = () => {
       const now = new Date();
 
       // Monthly Meetings
-      const monthlySnapshot = await getDocs(collection(db, "MonthlyMeeting"));
+      const monthlySnapshot = await getDocs(collection(db, COLLECTIONS.monthlyMeeting));
       const monthlyEvents = monthlySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -109,12 +108,12 @@ const HomePage = () => {
       setUpcomingMonthlyMeet(futureMonthly[0] || null);
 
       // Conclaves & NT Meetings
-      const conclaveSnapshot = await getDocs(collection(db, "Conclaves"));
+      const conclaveSnapshot = await getDocs(collection(db, COLLECTIONS.conclaves));
       setNtMeetCount(conclaveSnapshot.size);
 
       let allNTMeetings = [];
       for (const conclaveDoc of conclaveSnapshot.docs) {
-        const meetingsSnapshot = await getDocs(collection(db, "Conclaves", conclaveDoc.id, "meetings"));
+        const meetingsSnapshot = await getDocs(collection(db, COLLECTIONS.conclaves, conclaveDoc.id, "meetings"));
         meetingsSnapshot.forEach(doc => {
           allNTMeetings.push({ id: doc.id, conclaveId: conclaveDoc.id, ...doc.data(), time: doc.data().time?.toDate?.() || new Date(0) });
         });

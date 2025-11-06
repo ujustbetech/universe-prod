@@ -3,6 +3,8 @@ import { useRouter } from "next/router";
 import { collection, doc, setDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { useAuth } from "./authContext";
+import { COLLECTIONS } from "/utility_collection";
+
 
 export const usePageLogger = () => {
   const router = useRouter();
@@ -14,7 +16,7 @@ export const usePageLogger = () => {
     if (!user) return;
 
     startTime.current = new Date();
-    visitDocRef.current = doc(collection(db, "PageVisits")); // single doc for this page
+    visitDocRef.current = doc(collection(db, COLLECTIONS.pageVisit)); // single doc for this page
 
     const getBrowserInfo = () => {
       const ua = navigator.userAgent;

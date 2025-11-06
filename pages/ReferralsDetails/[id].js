@@ -7,6 +7,7 @@ import { app } from '../../firebaseConfig';
 import Headertop from '../../component/Header';
 import HeaderNav from '../../component/HeaderNav';
 import '../../src/app/styles/user.scss';
+import { COLLECTIONS } from "/utility_collection";
 
 const db = getFirestore(app);
 
@@ -22,7 +23,7 @@ const ReferralDetails = () => {
 
     const fetchReferral = async () => {
       try {
-        const docRef = doc(db, 'Referral', id);
+        const docRef = doc(db,COLLECTIONS.referral, id);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {

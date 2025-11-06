@@ -17,6 +17,7 @@ import { app } from "../firebaseConfig";
 import Link from 'next/link';
 import HeaderNav from "../component/HeaderNav";
 import Headertop from "../component/Header";
+import { COLLECTIONS } from "/utility_collection";
 import "../src/app/styles/user.scss";
 import { HiOutlineMail } from "react-icons/hi";
 import { IoIosCall } from "react-icons/io";
@@ -116,7 +117,7 @@ const UserReferrals = () => {
                     return;
                 }
 
-                const referralsCol = collection(db, "Referral");
+                const referralsCol = collection(db, COLLECTIONS.referral);
 
                 // My Referrals
                 const myQuery = query(
@@ -186,7 +187,7 @@ const UserReferrals = () => {
             const ref = referrals.find((r) => r.id === referralId);
             if (!ref) return;
 
-            const docRef = doc(db, "Referral", referralId);
+            const docRef = doc(db, COLLECTIONS.referral, referralId);
             const statusLog = { status: newStatus, updatedAt: Timestamp.now() };
 
             await updateDoc(docRef, {

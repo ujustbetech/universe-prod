@@ -40,18 +40,22 @@ const Profile = () => {
     const docSnap = await getDoc(doc(db, 'userdetail', phone));
     if (docSnap.exists()) {
       const data = docSnap.data();
-      setUserDetails({
-        ...data, // spread first
-        name: data[' Name'] || '',
-        email: data.Email || '',
-        dob: data.DOB || '',
-        gender: data.Gender || '',
-        mobile: data['Mobile no'] || '',
-        category: data.Category || '',
-        ujbCode: data['UJB Code'] || '',
-        services: Array.isArray(data.services) ? data.services : [],
-        products: Array.isArray(data.products) ? data.products : [],
-      });
+   setUserDetails({
+  ...data,
+  name: data[' Name'] || '',
+  email: data.Email || '',
+  dob: data.DOB || '',
+  gender: data.Gender || '',
+  mobile: data['Mobile no'] || '',
+  category: data.Category || '',
+  ujbCode: data['UJB Code'] || '',
+  services: Array.isArray(data.services) ? data.services : [],
+  products: Array.isArray(data.products) ? data.products : [],
+  BusinessSocialMediaPages: Array.isArray(data.BusinessSocialMediaPages)
+    ? data.BusinessSocialMediaPages
+    : []
+});
+
     }
   };
 
