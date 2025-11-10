@@ -16,38 +16,48 @@ export const AuthProvider = ({ children }) => {
     else setLoading(false);
   }, []);
 
-  const fetchUser = async (phone) => {
-    try {
-      const userRef = doc(db, "userdetails", phone);
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
-        const name = userDoc.data()[" Name"] || "User";
-        setUser({ phoneNumber: phone, name });
-        logLoginEvent(phone, name);
-      }
-    } catch (err) {
-      console.error("Error fetching user:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchUser = async (phone) => {
+  try {
+    const q = query(collection(db, "usersdetail"), where("phone", "==", phone));
+    const querySnapshot = await getDocs(q);
 
-  const login = async (phone) => {
-    try {
-      const userRef = doc(db, "userdetails", phone);
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
-        const name = userDoc.data()[" Name"] || "User";
-        localStorage.setItem("mmOrbiter", phone);
-        setUser({ phoneNumber: phone, name });
-        logLoginEvent(phone, name);
-        router.push("/");
-      } else throw new Error("User not found");
-    } catch (err) {
-      console.error("Login failed:", err);
-      throw err;
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      const ujbCode = userDoc.id;          // ✅ doc id
+      const name = userDoc.data()["Name"] || "User";
+
+      setUser({ phoneNumber: phone, name, ujbCode });
+      logLoginEvent(ujbCode, name);        // ✅ pass ujbCode instead of phone
     }
-  };
+  } catch (err) {
+    console.error("Error fetching user:", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+const login = async (phone) => {
+  try {
+    const q = query(collection(db, "usersdetail"), where("phone", "==", phone));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) throw new Error("User not found");
+
+    const userDoc = querySnapshot.docs[0];
+    const ujbCode = userDoc.id;            // ✅ doc id
+    const name = userDoc.data()["Name"] || "User";
+
+    localStorage.setItem("mmOrbiter", ujbCode);  // store UJB code
+    setUser({ phoneNumber: phone, name, ujbCode });
+    logLoginEvent(ujbCode, name);
+
+    router.push("/");
+  } catch (err) {
+    console.error("Login failed:", err);
+    throw err;
+  }
+};
 
   const logout = () => {
     localStorage.removeItem("mmOrbiter");

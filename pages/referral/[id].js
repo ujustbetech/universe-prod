@@ -107,6 +107,7 @@ const [cosmoOrbiter, setCosmoOrbiter] = useState(null);
         referralSource: data.referralSource || "",
         dealStatus: data.dealStatus || "Pending",
         dealValue: data.dealValue || "",
+        leadDescription : data.leadDescription || "",
       });
 
      if (data.orbiter?.phone) {
@@ -458,7 +459,12 @@ const { orbiter: referralOrbiter, cosmoOrbiter: referralCosmoOrbiter, service, p
     <p><strong>Percentage:</strong> {product.percentage}%</p>
   ) : null}
 
-
+ {referralData?.leadDescription && (
+    <p>
+      <strong>Lead Description:</strong><br />
+      {referralData.leadDescription}
+    </p>
+  )}
             {/* Trigger Modal */}
             <button className="calcDealBtn" onClick={() => setShowModal(true)}>
               Calculate Deal Value
