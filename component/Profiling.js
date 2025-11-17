@@ -54,13 +54,12 @@ const removeSocialMediaField = (index) => {
   setSocialMediaLinks(updated);
 };
 
-
 useEffect(() => {
   const fetchUserByPhone = async () => {
     try {
       if (!ujbcode) return;
 
-      const q = query(collection(db, 'usersdetail'), where('UJBCode', '==', ujbcode));
+      const q = query(collection(db,"usersdetail"), where('UJBCode', '==', ujbcode));
       const snapshot = await getDocs(q);
 
       if (!snapshot.empty) {
@@ -85,8 +84,11 @@ useEffect(() => {
             }))
           );
         }
+// --- populate payment safely ---
+const incomingPayments = userData.payment || {};
 
-        // Load products
+
+ // Load products
         if (userData.products?.length > 0) {
           setProducts(
             userData.products.map(p => ({
@@ -98,17 +100,19 @@ useEffect(() => {
             }))
           );
         }
+// --- When loading user data from Firestore (inside fetchUserByPhone) ---
+const pages = Array.isArray(userData.BusinessSocialMediaPages)
+  ? userData.BusinessSocialMediaPages
+  : [];
 
-   // Load Business Social Media Pages
-if (userData['BusinessSocialMediaPages']?.length > 0) {
-  setSocialMediaLinks(
-    userData['BusinessSocialMediaPages'].map((s) => ({
-      platform: socialPlatforms.includes(s.platform) ? s.platform : 'Other',
-      url: s.url,
-      customPlatform: !socialPlatforms.includes(s.platform) ? s.platform : '',
-    }))
-  );
-}
+setSocialMediaLinks(
+  pages.map((s) => ({
+    platform: s?.platform || '',
+    link: s?.link || ''
+  }))
+);
+
+
       }
     } catch (err) {
       console.error('Error fetching user:', err);
@@ -117,7 +121,6 @@ if (userData['BusinessSocialMediaPages']?.length > 0) {
 
   fetchUserByPhone();
 }, [ujbcode]);
-
 
   const [allUsers, setAllUsers] = useState([]);
   const [formData, setFormData] = useState({});
@@ -200,7 +203,7 @@ useEffect(() => {
   };
 const uploadProfilePhoto = async () => {
   if (!profilePic || !docId) return '';
-  const fileRef = ref(storage, `profilePhotos/${docId}/${profilePic.name}`);
+  const fileRef = ref(storage, `UserAsset/${docId}/${profilePic.name}`);
   await uploadBytes(fileRef, profilePic);
   Swal.fire({
     icon: 'success',
@@ -259,7 +262,7 @@ const handleSubmit = async () => {
 
     let businessLogoURL = '';
     if (businessLogo && docId) {
-      const logoRef = ref(storage, `businessLogos/${docId}/${businessLogo.name}`);
+      const logoRef = ref(storage, `UserAsset/${docId}/${businessLogo.name}`);
       await uploadBytes(logoRef, businessLogo);
       businessLogoURL = await getDownloadURL(logoRef);
       Swal.fire({
@@ -279,7 +282,7 @@ const handleSubmit = async () => {
     const serviceData = await Promise.all(
       filteredServices.map(async (srv, i) => {
         const imgURL = srv.image
-          ? await uploadImage(srv.image, `serviceImages/${docId}/service_${i}`)
+          ? await uploadImage(srv.image, `UserAsset/${docId}/service_${i}`)
           : '';
         return {
           name: srv.name,
@@ -295,7 +298,7 @@ const handleSubmit = async () => {
     const productData = await Promise.all(
       filteredProducts.map(async (prd, i) => {
         const imgURL = prd.image
-          ? await uploadImage(prd.image, `productImages/${docId}/product_${i}`)
+          ? await uploadImage(prd.image, `UserAsset/${docId}/product_${i}`)
           : '';
         return {
           name: prd.name,
@@ -340,7 +343,7 @@ const dropdowns = {
   Gender: ['Male', 'Female', 'Transgender', 'Prefer not to say'],
   'IDType': ['Aadhaar', 'PAN', 'Passport', 'Driving License'],
   'InterestArea': ['Business', 'Education', 'Wellness', 'Technology', 'Art', 'Environment', 'Other'],
-  'Current Health Condition': ['Excellent', 'Good', 'Average', 'Needs Attention'],
+  'CurrentHealthCondition': ['Excellent', 'Good', 'Average', 'Needs Attention'],
   'MaritalStatus': ['Single', 'Married', 'Widowed', 'Divorced'],
   'EducationalBackground': ['SSC', 'HSC', 'Graduate', 'Post-Graduate', 'PhD', 'Other'],
   'ProfileStatus': ['Pending', 'In process', 'Submitted', 'Verified', 'Inactive'],
@@ -356,12 +359,12 @@ const dropdowns = {
   const contributionOptions = ['Referrals', 'Volunteering', 'RHW Activities', 'Content Creation', 'Mentorship'];
 
 const orbiterFields = [
-  'IDType', 'ID Number', 'Upload Photo',
+  'IDType', 'IDNumber', 'Upload Photo',
   'City', 'State', 'Location', // ✅ Added here
   'Hobbies', 'Interest Area', 'Skills', 'Exclusive Knowledge',
-  'Aspirations', 'Health Parameters', 'Current Health Condition',
-  'FamilyHistorySummary', 'Marital Status', 'Professional History',
-  'CurrentProfession', 'Educational Background', 'Languages Known',
+  'Aspirations', 'HealthParameters', 'CurrentHealthCondition',
+  'FamilyHistorySummary', 'MaritalStatus', 'ProfessionalHistory',
+  'CurrentProfession', 'EducationalBackground', 'LanguagesKnown',
   'ContributionAreainUJustBe', 'Immediate Desire', 'Mastery',
   'SpecialSocialContribution', 'ProfileStatus',  'BusinessSocialMediaPages',  // 👈 add this line
 
@@ -574,7 +577,7 @@ if (field === 'BusinessSocialMediaPages') {
      
  
  <div className="step-progress-bar">
-  {['Personal Info', 'Health', 'Education', 'Business Info', 'Additional Info'].map((tab, index) => (
+  {['Personal Info', 'Health', 'Education', 'BusinessInfo', 'Additional Info'].map((tab, index) => (
     <div key={tab} className="step-container">
       <button
         className={`step ${activeTab === tab ? "active" : ""}`}
@@ -634,7 +637,7 @@ if (field === 'BusinessSocialMediaPages') {
            
           </>
         )}
-{activeTab === 'Business Info' && formData?.Category?.toLowerCase() === 'cosmorbiter' && (
+{activeTab === 'BusinessInfo' && formData?.Category?.toLowerCase() === 'cosmorbiter' && (
   <>
     <div >
       
