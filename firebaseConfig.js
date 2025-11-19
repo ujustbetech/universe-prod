@@ -1,10 +1,15 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth'
+// firebaseConfig.js
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+import { 
+  getAuth, 
+  RecaptchaVerifier, 
+  signInWithPhoneNumber 
+} from "firebase/auth";
 
 const firebaseConfig = {
-   apiKey: "AIzaSyARJI0DZgGwH9j2Hz318ddonBd55IieUBs",
+  apiKey: "AIzaSyARJI0DZgGwH9j2Hz318ddonBd55IieUBs",
   authDomain: "monthlymeetingapp.firebaseapp.com",
   projectId: "monthlymeetingapp",
   storageBucket: "monthlymeetingapp.appspot.com",
@@ -13,9 +18,20 @@ const firebaseConfig = {
   measurementId: "G-26KEDXQKK9"
 };
 
-const app = initializeApp(firebaseConfig);
+// ✅ Initialize Firebase only once (prevents duplicate-app error)
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// ✅ Services
+const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
-const auth = getAuth(app);
 
-export {app, db, storage,RecaptchaVerifier,signInWithPhoneNumber,auth};
+// ✅ EXPORT EVERYTHING NEEDED FOR OTP LOGIN
+export {
+  app,
+  auth,
+  db,
+  storage,
+  RecaptchaVerifier,
+  signInWithPhoneNumber
+};

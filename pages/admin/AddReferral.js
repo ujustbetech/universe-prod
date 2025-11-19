@@ -25,6 +25,7 @@ const Profiling = () => {
 const [lastUpdated, setLastUpdated] = useState(new Date());
 // Add separate state for "Other Referral Source"
 const [otherReferralSource, setOtherReferralSource] = useState("");
+const [leadDescription, setLeadDescription] = useState("");
 
   const [products, setProducts] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
@@ -47,15 +48,13 @@ const [otherReferralSource, setOtherReferralSource] = useState("");
   }, []);
 
   const handleOrbiterSelect = (user) => {
-  setSelectedOrbiter(user);
-  setOrbiterSearch(user.Name);
-};
-
+    setSelectedOrbiter(user);
+    setOrbiterSearch(user[" Name"]);
+  };
 
   const handleCosmoSelect = async (user) => {
     setSelectedCosmo(user);
- setCosmoSearch(user.Name);
-
+    setCosmoSearch(user[" Name"]);
     setSelectedService(null);
     setSelectedProduct(null);
     setServices([]);
@@ -125,24 +124,24 @@ const [otherReferralSource, setOtherReferralSource] = useState("");
 
     const data = {
       referralId,
-    orbiter: {
-  name: selectedOrbiter.Name || "",
-  email: selectedOrbiter.Email || "",
-  phone: selectedOrbiter.MobileNo || "",
-  ujbCode: selectedOrbiter.UJBCode || "",
-  mentorName: selectedOrbiter.MentorName || "",
-  mentorPhone: selectedOrbiter.MentorPhone || "",
-},
-
-     cosmoOrbiter: {
-  name: selectedCosmo.Name || "",
-  email: selectedCosmo.Email || "",
-  phone: selectedCosmo.MobileNo || "",
-  mentorName: selectedCosmo.MentorName || "",
-  mentorPhone: selectedCosmo.MentorPhone || "",
-},
+      orbiter: {
+        name: selectedOrbiter[" Name"],
+        email: selectedOrbiter["Email"],
+        phone: selectedOrbiter["Mobile no"],
+        ujbCode: selectedOrbiter["UJB Code"],
+        mentorName: selectedOrbiter["Mentor Name"],
+        mentorPhone: selectedOrbiter["Mentor Phone"],
+      },
+      cosmoOrbiter: {
+        name: selectedCosmo[" Name"],
+        email: selectedCosmo["Email"],
+        phone: selectedCosmo["Mobile no"],
+        mentorName: selectedCosmo["Mentor Name"],
+        mentorPhone: selectedCosmo["Mentor Phone"],
+      },
       service: selectedService,
       product: selectedProduct,
+        leadDescription: leadDescription || "",
       referralType: refType,
       referralSource:
         referralSource === "Other" ? otherReferralSource : referralSource,
@@ -167,15 +166,15 @@ const [otherReferralSource, setOtherReferralSource] = useState("");
       selectedService?.name || selectedProduct?.name || "";
 
     await Promise.all([
-   sendWhatsAppTemplate(
-        selectedOrbiter.MobileNo,
-        selectedOrbiter.Name,
-        `🚀 You’ve just passed a referral for *${serviceOrProduct}* to *${selectedCosmo.Name}*. It’s now in motion and will be actioned within 24 hours. Great start toward contribution! 🌱`
+      sendWhatsAppTemplate(
+        selectedOrbiter["Mobile no"],
+        selectedOrbiter[" Name"],
+        `🚀 You’ve just passed a referral for *${serviceOrProduct}* to *${selectedCosmo[" Name"]}*. It’s now in motion and will be actioned within 24 hours. Great start toward contribution! 🌱`
       ),
       sendWhatsAppTemplate(
-        selectedCosmo.MobileNo,
-        selectedCosmo.Name,
-        `✨ You’ve received a referral from *${selectedOrbiter.Name}* for *${serviceOrProduct}*. Let’s honor their trust — please act within the next 24 hours!`
+        selectedCosmo["Mobile no"],
+        selectedCosmo[" Name"],
+        `✨ You’ve received a referral from *${selectedOrbiter[" Name"]}* for *${serviceOrProduct}*. Let’s honor their trust — please act within the next 24 hours!`
       ),
       // sendWhatsAppTemplate(
       //   selectedOrbiter["Mentor Phone"],
@@ -198,6 +197,8 @@ const [otherReferralSource, setOtherReferralSource] = useState("");
     setProducts([]);
     setSelectedService(null);
     setSelectedProduct(null);
+    setLeadDescription("");
+
     setRefType("Self");
     setOtherName("");
     setOtherPhone("");
@@ -235,14 +236,13 @@ const [otherReferralSource, setOtherReferralSource] = useState("");
         {orbiterSearch && (
           <ul className="search-results">
            {users
- .filter((u) => {
-  const name = u.Name || "";
-  return name.toLowerCase().includes(orbiterSearch.toLowerCase());
-})
-
+  .filter((u) => {
+    const name = u[" Name"] || ""; // fallback to empty string
+    return name.toLowerCase().includes(orbiterSearch.toLowerCase());
+  })
   .map((user) => (
     <li key={user.id} onClick={() => handleOrbiterSelect(user)}>
-      {user.Name}
+      {user[" Name"]}
     </li>
   ))}
 
@@ -262,19 +262,18 @@ const [otherReferralSource, setOtherReferralSource] = useState("");
   {cosmoSearch && (
     <ul className="search-results">
      {users
-.filter((u) => {
-  const name = u.Name || "";
-  return (
-    u.Category === "CosmOrbiter" &&
-    ((Array.isArray(u.products) && u.products.length > 0) ||
-    (Array.isArray(u.services) && u.services.length > 0)) &&
-    name.toLowerCase().includes(cosmoSearch.toLowerCase())
-  );
-})
-
+  .filter((u) => {
+    const name = u[" Name"] || "";
+    return (
+      u.Category === "CosmOrbiter" &&
+      ((Array.isArray(u.products) && u.products.length > 0) ||
+        (Array.isArray(u.services) && u.services.length > 0)) &&
+      name.toLowerCase().includes(cosmoSearch.toLowerCase())
+    );
+  })
   .map((user) => (
     <li key={user.id} onClick={() => handleCosmoSelect(user)}>
-      {user.Name}
+      {user[" Name"]}
     </li>
   ))}
 
@@ -323,6 +322,19 @@ const [otherReferralSource, setOtherReferralSource] = useState("");
           </select>
         </li>
       )}
+{/* Lead Description */}
+{(selectedService || selectedProduct) && (
+  <li className="form-group">
+    <label>Lead Description</label>
+    <textarea
+      value={leadDescription}
+      onChange={(e) => setLeadDescription(e.target.value)}
+      placeholder="Enter Lead Description"
+      rows={3}
+      style={{ width: "100%" }}
+    />
+  </li>
+)}
 
       {/* Deal Status */}
     <li className="form-group">

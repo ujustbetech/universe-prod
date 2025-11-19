@@ -640,21 +640,19 @@ section h4 {
 }
 
 .profileHeaderOneLine {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  /* spacing between items */
-  padding: 10px 20px;
-  width: 80%;
-  background: #fff;
-  margin-bottom: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  font-size: 14px;
-  flex-wrap: nowrap;
-  /* ✅ force single line */
-  overflow-x: auto;
-  /* ✅ allow scrolling if content is too long */
+display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 10px 20px;
+    width: 80%;
+    background: #fff;
+    margin-bottom: 20px;
+    margin-top: 74px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    font-size: 14px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
 }
 
 .profilePhoto {
@@ -896,4 +894,49 @@ section h4 {
   border-radius: 6px;
   display: inline-block;
   margin-left: 6px;
+}
+.m-button {
+  width: 9em;
+  height: 3em;
+  border-radius: 30em;
+  /* font-size: 15px; */
+  /* font-family: inherit; */
+  border: none;
+  position: relative;
+  overflow: hidden;
+  color: #FFF;
+  z-index: 1;
+  background-color: #f16f06;
+  display: flex;
+  column-gap: 10px;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  font-family: 'Mukta', sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: .5s ease;
+  text-decoration: none;
+}
+
+.m-button::before {
+  content: '';
+  width: 0;
+  height: 3em;
+  border-radius: 30em;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-image: linear-gradient(to right, #a2cbda 0%, #819eb0 100%);
+  transition: .5s ease;
+  display: block;
+  z-index: -1;
+}
+
+.m-button:hover::before {
+  width: 100%;
+}
+
+.m-button:hover {
+  color: #f16f06;
 }

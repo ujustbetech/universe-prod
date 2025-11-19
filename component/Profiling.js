@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Swal from 'sweetalert2';
-
+import { COLLECTIONS } from "/utility_collection";
 import { db, storage } from '../firebaseConfig';
 import { useSearchParams } from 'next/navigation'; 
 
@@ -24,6 +24,74 @@ const [profilePreview, setProfilePreview] = useState('');
 const [businessLogoPreview, setBusinessLogoPreview] = useState('');
 const [servicePreviews, setServicePreviews] = useState([]); 
 const [productPreviews, setProductPreviews] = useState([]);
+// payment state: orbiter + cosmo entries, each may include a screenshotFile (temp) + preview
+const [payment, setPayment] = useState({
+  orbiter: {
+    feeType: '',      // 'upfront' | 'adjustment'
+    amount: 1000,
+    status: 'unpaid', // 'paid' | 'adjusted' | 'unpaid'
+    paidDate: '',
+    paymentMode: '',
+    paymentId: '',
+    screenshotURL: '',    // persisted URL from storage
+    screenshotFile: null, // local file object (not persisted)
+    screenshotPreview: '' // local preview for UI
+  },
+  cosmo: {
+    amount: 5000,
+    status: 'unpaid', // 'paid' | 'unpaid'
+    paidDate: '',
+    paymentMode: '',
+    paymentId: '',
+    screenshotURL: '',
+    screenshotFile: null,
+    screenshotPreview: ''
+  }
+});
+
+const paymentModes = ['UPI', 'Cash', 'Bank Transfer', 'Credit Card', 'Debit Card', 'NEFT/RTGS'];
+const [mode, setMode] = useState("single");
+
+  const [singleData, setSingleData] = useState({
+    type: "",
+    value: "",
+  });
+
+  const [multipleData, setMultipleData] = useState([]);
+
+  // ➤ Add new slab entry
+  const addSlab = () => {
+    setMultipleData([
+      ...multipleData,
+      { mode: "slab", from: "", to: "", type: "", value: "" },
+    ]);
+  };
+
+  // ➤ Add new product entry
+  const addProductEntry = () => {
+    setMultipleData([
+      ...multipleData,
+      { mode: "product", productName: "", type: "", value: "" },
+    ]);
+  };
+
+  // ➤ Remove entry
+  const removeEntry = (index) => {
+    const updated = [...multipleData];
+    updated.splice(index, 1);
+    setMultipleData(updated);
+  };
+
+  // ➤ Update entry
+  const updateEntry = (index, field, value) => {
+    const updated = [...multipleData];
+    updated[index][field] = value;
+    setMultipleData(updated);
+  };
+
+ 
+
+// --- social platform list ---
 const socialPlatforms = [
   'Facebook',
   'Instagram',
@@ -31,35 +99,53 @@ const socialPlatforms = [
   'YouTube',
   'Twitter',
   'Pinterest',
-  'Other' // 👈 Added here
+  'Other' // keep Other for custom names
 ];
 
+// --- social links state (start with one blank entry) ---
 const [socialMediaLinks, setSocialMediaLinks] = useState([
   { platform: '', url: '', customPlatform: '' },
 ]);
 
+// --- change handler ---
 const handleSocialMediaChange = (index, key, value) => {
-  const updated = [...socialMediaLinks];
-  updated[index][key] = value;
-  setSocialMediaLinks(updated);
+  setSocialMediaLinks((prev) => {
+    const updated = [...prev];
+    // ensure entry exists
+    if (!updated[index]) updated[index] = { platform: '', url: '', customPlatform: '' };
+
+    // if platform changed to a non-Other, clear customPlatform
+    if (key === 'platform') {
+      updated[index].platform = value;
+      if (value !== 'Other') updated[index].customPlatform = '';
+    } else {
+      updated[index][key] = value;
+    }
+    return updated;
+  });
 };
 
+// --- add / remove helpers ---
 const addSocialMediaField = () => {
-  setSocialMediaLinks([...socialMediaLinks, { platform: '', url: '', customPlatform: '' }]);
+  setSocialMediaLinks((prev) => [...prev, { platform: '', url: '', customPlatform: '' }]);
 };
 
 const removeSocialMediaField = (index) => {
-  const updated = [...socialMediaLinks];
-  updated.splice(index, 1);
-  setSocialMediaLinks(updated);
+  setSocialMediaLinks((prev) => {
+    const updated = [...prev];
+    updated.splice(index, 1);
+    // ensure at least one blank entry remains
+    return updated.length ? updated : [{ platform: '', url: '', customPlatform: '' }];
+  });
 };
+
 
 useEffect(() => {
   const fetchUserByPhone = async () => {
     try {
       if (!ujbcode) return;
 
-      const q = query(collection(db,"usersdetail"), where('UJBCode', '==', ujbcode));
+      const q = query(collection(db, COLLECTIONS.userDetail), where('UJBCode', '==', ujbcode));
       const snapshot = await getDocs(q);
 
       if (!snapshot.empty) {
@@ -69,10 +155,10 @@ useEffect(() => {
         setFormData(userData);
         setDocId(userDoc.id);
 
-        if (userData['Profile Photo URL']) setProfilePreview(userData['ProfilePhotoURL']);
-        if (userData['Business Logo']) setBusinessLogoPreview(userData['BusinessLogo']);
+        if (userData['ProfilePhotoURL']) setProfilePreview(userData['ProfilePhotoURL']);
+        if (userData['BusinessLogo']) setBusinessLogoPreview(userData['BusinessLogo']);
 
-        // Load services
+        // SERVICES
         if (userData.services?.length > 0) {
           setServices(
             userData.services.map(s => ({
@@ -84,11 +170,34 @@ useEffect(() => {
             }))
           );
         }
-// --- populate payment safely ---
-const incomingPayments = userData.payment || {};
 
+        // PAYMENT
+        const incomingPayments = userData.payment || {};
+        setPayment((prev) => ({
+          orbiter: {
+            feeType: incomingPayments?.orbiter?.feeType || prev.orbiter.feeType || '',
+            amount: incomingPayments?.orbiter?.amount || 1000,
+            status: incomingPayments?.orbiter?.status || prev.orbiter.status || 'unpaid',
+            paidDate: incomingPayments?.orbiter?.paidDate || '',
+            paymentMode: incomingPayments?.orbiter?.paymentMode || '',
+            paymentId: incomingPayments?.orbiter?.paymentId || '',
+            screenshotURL: incomingPayments?.orbiter?.screenshotURL || '',
+            screenshotFile: null,
+            screenshotPreview: incomingPayments?.orbiter?.screenshotURL || ''
+          },
+          cosmo: {
+            amount: incomingPayments?.cosmo?.amount || 5000,
+            status: incomingPayments?.cosmo?.status || prev.cosmo.status || 'unpaid',
+            paidDate: incomingPayments?.cosmo?.paidDate || '',
+            paymentMode: incomingPayments?.cosmo?.paymentMode || '',
+            paymentId: incomingPayments?.cosmo?.paymentId || '',
+            screenshotURL: incomingPayments?.cosmo?.screenshotURL || '',
+            screenshotFile: null,
+            screenshotPreview: incomingPayments?.cosmo?.screenshotURL || ''
+          }
+        }));
 
- // Load products
+        // PRODUCTS
         if (userData.products?.length > 0) {
           setProducts(
             userData.products.map(p => ({
@@ -100,27 +209,90 @@ const incomingPayments = userData.payment || {};
             }))
           );
         }
-// --- When loading user data from Firestore (inside fetchUserByPhone) ---
-const pages = Array.isArray(userData.BusinessSocialMediaPages)
-  ? userData.BusinessSocialMediaPages
-  : [];
 
-setSocialMediaLinks(
-  pages.map((s) => ({
-    platform: s?.platform || '',
-    link: s?.link || ''
-  }))
-);
+        // SOCIAL MEDIA LINKS
+        const pages = Array.isArray(userData.BusinessSocialMediaPages)
+          ? userData.BusinessSocialMediaPages
+          : [];
 
+        setSocialMediaLinks(
+          pages.map((s) => ({
+            platform: s.platform || "",
+            url: s.url || ""
+          }))
+        );
 
+        // -------------------------
+        // LOAD AGREED VALUE HERE
+        // -------------------------
+        if (userData.AgreedValue) {
+          const agreed = userData.AgreedValue;
+
+          setMode(agreed.mode || "single");
+
+          // Load Single
+          if (agreed.mode === "single" && agreed.single) {
+            setSingleData({
+              type: agreed.single.type || "",
+              value: agreed.single.value || ""
+            });
+          }
+
+          // Load Multiple
+          if (agreed.mode === "multiple" && Array.isArray(agreed.multiple)) {
+            setMultipleData(
+              agreed.multiple.map((item) => ({
+                mode: item.mode || "slab",
+                from: item.from || "",
+                to: item.to || "",
+                itemName: item.itemName || "",
+                type: item.type || "",
+                value: item.value || ""
+              }))
+            );
+          }
+        }
       }
     } catch (err) {
-      console.error('Error fetching user:', err);
+      console.error("Error fetching user:", err);
     }
   };
 
   fetchUserByPhone();
 }, [ujbcode]);
+
+
+const handlePaymentScreenshotChange = (feeKey, file) => {
+  if (!file) return;
+  const preview = URL.createObjectURL(file);
+  setPayment((p) => ({
+    ...p,
+    [feeKey]: {
+      ...p[feeKey],
+      screenshotFile: file,
+      screenshotPreview: preview
+    }
+  }));
+};
+
+const clearPaymentScreenshot = (feeKey) => {
+  setPayment((p) => ({
+    ...p,
+    [feeKey]: {
+      ...p[feeKey],
+      screenshotFile: null,
+      screenshotPreview: p[feeKey].screenshotURL || ''
+    }
+  }));
+};
+const uploadPaymentScreenshot = async (file, feeKey) => {
+  if (!file || !docId) return '';
+  const timestamp = Date.now();
+  const path = `users/${docId}/payments/${feeKey}_screenshot_${timestamp}_${file.name}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file);
+  return await getDownloadURL(fileRef);
+};
 
   const [allUsers, setAllUsers] = useState([]);
   const [formData, setFormData] = useState({});
@@ -155,7 +327,7 @@ const handleChange = (e) => {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const snapshot = await getDocs(collection(db, 'usersdetail'));
+      const snapshot = await getDocs(collection(db, COLLECTIONS.userDetail));
       const users = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
@@ -203,7 +375,7 @@ useEffect(() => {
   };
 const uploadProfilePhoto = async () => {
   if (!profilePic || !docId) return '';
-  const fileRef = ref(storage, `UserAsset/${docId}/${profilePic.name}`);
+  const fileRef = ref(storage, `profilePhotos/${docId}/${profilePic.name}`);
   await uploadBytes(fileRef, profilePic);
   Swal.fire({
     icon: 'success',
@@ -255,14 +427,13 @@ const handleDynamicChange = (type, index, field, value) => {
     setProducts(updater);
   }
 };
-
 const handleSubmit = async () => {
   try {
     const profileURL = await uploadProfilePhoto();
 
     let businessLogoURL = '';
     if (businessLogo && docId) {
-      const logoRef = ref(storage, `UserAsset/${docId}/${businessLogo.name}`);
+      const logoRef = ref(storage, `businessLogos/${docId}/${businessLogo.name}`);
       await uploadBytes(logoRef, businessLogo);
       businessLogoURL = await getDownloadURL(logoRef);
       Swal.fire({
@@ -274,15 +445,14 @@ const handleSubmit = async () => {
       });
     }
 
-    // First, filter services and products
+    // Services + Products Filtering
     const filteredServices = services.filter(s => s.name.trim() && s.description.trim());
     const filteredProducts = products.filter(p => p.name.trim() && p.description.trim());
 
-    // Upload service images
     const serviceData = await Promise.all(
       filteredServices.map(async (srv, i) => {
         const imgURL = srv.image
-          ? await uploadImage(srv.image, `UserAsset/${docId}/service_${i}`)
+          ? await uploadImage(srv.image, `serviceImages/${docId}/service_${i}`)
           : '';
         return {
           name: srv.name,
@@ -294,11 +464,10 @@ const handleSubmit = async () => {
       })
     );
 
-    // Upload product images
     const productData = await Promise.all(
       filteredProducts.map(async (prd, i) => {
         const imgURL = prd.image
-          ? await uploadImage(prd.image, `UserAsset/${docId}/product_${i}`)
+          ? await uploadImage(prd.image, `productImages/${docId}/product_${i}`)
           : '';
         return {
           name: prd.name,
@@ -310,24 +479,96 @@ const handleSubmit = async () => {
       })
     );
 
-    // Now declare updatedData
+    // PAYMENT BLOCK
+    const paymentToSave = {
+      orbiter: {
+        feeType: payment.orbiter?.feeType || 'upfront',
+        amount: 1000,
+        status: payment.orbiter?.status || 'unpaid',
+        paidDate: payment.orbiter?.paidDate || '',
+        paymentMode: payment.orbiter?.paymentMode || '',
+        paymentId: payment.orbiter?.paymentId || '',
+        screenshotURL: payment.orbiter?.screenshotURL || ''
+      },
+      cosmo: {
+        amount: 5000,
+        status: payment.cosmo?.status || 'unpaid',
+        paidDate: payment.cosmo?.paidDate || '',
+        paymentMode: payment.cosmo?.paymentMode || '',
+        paymentId: payment.cosmo?.paymentId || '',
+        screenshotURL: payment.cosmo?.screenshotURL || ''
+      }
+    };
+
+    // -------------------------
+    // BUILD slabs / productSlabs FROM multipleData (avoid undefined)
+    // multipleData should be your state array that stores entries added by user
+    // each entry should have a .mode field === 'slab' | 'product' | 'service'
+    const allMultiple = Array.isArray(multipleData) ? multipleData : [];
+
+    const slabs = allMultiple.filter(e => e.mode === 'slab').map(s => ({
+      from: s.from || '',
+      to: s.to || '',
+      type: s.type || '',      // 'percentage' | 'amount'
+      value: s.value || ''
+    }));
+
+    const productSlabs = allMultiple
+      .filter(e => e.mode === 'product' || e.mode === 'service') // include services if you stored them as 'service'
+      .map(p => ({
+        itemType: p.mode === 'product' ? 'product' : 'service',
+        itemName: p.productName || p.serviceName || p.itemName || '',
+        type: p.type || '',     // 'percentage' | 'amount'
+        value: p.value || ''
+      }));
+    // -------------------------
+
+    // AGREED VALUE — FINAL FORMAT FOR FIRESTORE
+    const agreedValueToSave = {
+      mode,  // "single" | "multiple"
+
+      ...(mode === "single" && {
+        single: {
+          type: singleData?.type || '',     // percentage | amount
+          value: singleData?.value || ''    // number / string
+        }
+      }),
+
+      ...(mode === "multiple" && {
+        multiple: {
+          slabs,         // array of slab objects
+          productSlabs   // array of product/service objects
+        }
+      })
+    };
+
+    // FINAL DATA TO SAVE
     const updatedData = {
       ...formData,
-      ...(profileURL && { 'ProfilePhotoURL': profileURL }),
-      ...(businessLogoURL && { 'BusinessLogo': businessLogoURL }),
+      ...(profileURL && { ProfilePhotoURL: profileURL }),
+      ...(businessLogoURL && { BusinessLogo: businessLogoURL }),
       ...(serviceData.length > 0 && { services: serviceData }),
       ...(productData.length > 0 && { products: productData }),
-      ...(socialMediaLinks.length > 0 && { 
-        'BusinessSocialMediaPages': socialMediaLinks
-          .filter((s) => s.url)
+
+      ...(socialMediaLinks.length > 0 && {
+        BusinessSocialMediaPages: socialMediaLinks
+          .filter((s) => s.url && (s.platform || s.customPlatform))
           .map((s) => ({
-            platform: s.platform === 'Other' ? s.customPlatform || 'Other' : s.platform,
+            platform: s.platform === 'Other'
+              ? (s.customPlatform || 'Other')
+              : s.platform,
             url: s.url
           }))
       }),
+
+      payment: paymentToSave,
+
+      // SAVE AGREED VALUE HERE
+      AgreedValue: agreedValueToSave
     };
 
-    const userRef = doc(db, 'usersdetail', docId);
+    // FIRESTORE UPDATE
+    const userRef = doc(db, COLLECTIONS.userDetail, docId);
     await updateDoc(userRef, updatedData);
 
     alert('Profile updated successfully!');
@@ -337,6 +578,44 @@ const handleSubmit = async () => {
   }
 };
 
+
+const handleBusinessApprove = async () => {
+  try {
+    const today = new Date();
+    const startDate = today.toISOString().split('T')[0];
+
+    const nextYear = new Date(today);
+    nextYear.setFullYear(today.getFullYear() + 1);
+    const nextRenewalDate = nextYear.toISOString().split('T')[0];
+
+    const subscriptionData = {
+      subscription: {
+        startDate,
+        nextRenewalDate,
+        status: 'active'
+      }
+    };
+
+    const userRef = doc(db,COLLECTIONS.userDetail, docId);
+    await updateDoc(userRef, subscriptionData);
+
+    Swal.fire({
+      icon: "success",
+      title: "Business Approved ✅",
+      text: `Next Renewal: ${nextRenewalDate}`,
+      timer: 2000,
+      showConfirmButton: false
+    });
+
+    setFormData((prev) => ({
+      ...prev,
+      subscription: subscriptionData.subscription
+    }));
+
+  } catch (err) {
+    console.error("Subscription update error:", err);
+  }
+};
 
 
 const dropdowns = {
@@ -361,21 +640,28 @@ const dropdowns = {
 const orbiterFields = [
   'IDType', 'IDNumber', 'Upload Photo',
   'City', 'State', 'Location', // ✅ Added here
-  'Hobbies', 'Interest Area', 'Skills', 'Exclusive Knowledge',
-  'Aspirations', 'HealthParameters', 'CurrentHealthCondition',
+  'Hobbies', 'InterestArea', 'Skills', 'Exclusive Knowledge',
+  'Aspirations', 'Health Parameters', 'CurrentHealthCondition',
   'FamilyHistorySummary', 'MaritalStatus', 'ProfessionalHistory',
   'CurrentProfession', 'EducationalBackground', 'LanguagesKnown',
-  'ContributionAreainUJustBe', 'Immediate Desire', 'Mastery',
+  'ContributionAreainUJustBe', 'ImmediateDesire', 'Mastery',
   'SpecialSocialContribution', 'ProfileStatus',  'BusinessSocialMediaPages',  // 👈 add this line
 
 ];
 
 const cosmorbiterFields = [
   ...orbiterFields,
-  'BusinessName', 'BusinessDetails(Nature & Type)', 'BusinessHistory',
-  'NoteworthyAchievements', 'ClienteleBase', 
-  'Website', 'Locality', 'AreaofServices', 'USP', 'BusinessLogo',
-  'TagLine',  
+  'BusinessName',
+  'BusinessDetails (Nature & Type)', // ✅ space added
+  'BusinessHistory',
+  'NoteworthyAchievements',
+  'ClienteleBase',
+  'Website',
+  'Locality',
+  'AreaofServices',
+  'USP',
+  'BusinessLogo',
+  'TagLine',
   'EstablishedAt'
 ];
 
@@ -455,9 +741,13 @@ if (field === 'BusinessSocialMediaPages') {
                 {p}
               </option>
             ))}
+            {/* If the stored platform was custom and not in the list, allow showing it as selected */}
+            {link.platform === 'Other' && link.customPlatform && (
+              <option value="Other">Other ({link.customPlatform})</option>
+            )}
           </select>
 
-          {/* 👇 if 'Other' is selected, show an input box for custom name */}
+          {/* show custom input only when platform === 'Other' */}
           {link.platform === 'Other' && (
             <input
               type="text"
@@ -496,6 +786,7 @@ if (field === 'BusinessSocialMediaPages') {
     </div>
   );
 }
+
 
     if (field === 'ContributionAreainUJustBe') {
       return (
@@ -577,7 +868,7 @@ if (field === 'BusinessSocialMediaPages') {
      
  
  <div className="step-progress-bar">
-  {['Personal Info', 'Health', 'Education', 'BusinessInfo', 'Additional Info'].map((tab, index) => (
+  {['Personal Info', 'Health', 'Education', 'BusinessInfo', 'Additional Info','Payment'].map((tab, index) => (
     <div key={tab} className="step-container">
       <button
         className={`step ${activeTab === tab ? "active" : ""}`}
@@ -603,7 +894,6 @@ if (field === 'BusinessSocialMediaPages') {
               </div>
             </li>
 
-      
          <li className="form-row">
   <h4>Category</h4>
   <div className="multipleitem">
@@ -619,6 +909,7 @@ if (field === 'BusinessSocialMediaPages') {
     </select>
   </div>
 </li>
+
 
             <li className="form-row">
               <h4>Email</h4>
@@ -839,8 +1130,547 @@ if (field === 'BusinessSocialMediaPages') {
   </div>
 )}
 </div>
+{/* ✅ BUSINESS INFO FIELDS (Dynamic) */}
+ {/* --- AGREED VALUE SECTION --- */}
+<div
+  style={{
+    border: "1px solid #ccc",
+    padding: "15px",
+    borderRadius: "8px",
+    background: "#fafafa",
+    marginTop: "40px",
+  }}
+>
+  <h3 style={{ marginBottom: "15px" }}>Agreed Percentage / Amount</h3>
+
+  {/* Mode Switch */}
+  <div className="form-row">
+    <label style={{ marginRight: "20px" }}>
+      <input
+        type="radio"
+        name="mode"
+        value="single"
+        checked={mode === "single"}
+        onChange={() => setMode("single")}
+      />
+      <span style={{ marginLeft: "5px" }}>Single</span>
+    </label>
+
+    <label>
+      <input
+        type="radio"
+        name="mode"
+        value="multiple"
+        checked={mode === "multiple"}
+        onChange={() => setMode("multiple")}
+      />
+      <span style={{ marginLeft: "5px" }}>Multiple</span>
+    </label>
+  </div>
+
+  {/* ---------- SINGLE MODE UI ---------- */}
+  {mode === "single" && (
+    <div
+      style={{
+        border: "1px solid #ccc",
+        padding: "15px",
+        borderRadius: "8px",
+        marginTop: "20px",
+        background: "white",
+      }}
+    >
+      <div className="form-row">
+        <h4>Type</h4>
+        <select
+          value={singleData.type}
+          onChange={(e) =>
+            setSingleData({ ...singleData, type: e.target.value })
+          }
+          className="multipleitem"
+        >
+          <option value="">Select</option>
+          <option value="percentage">Percentage (%)</option>
+          <option value="amount">Amount (Rs)</option>
+        </select>
+      </div>
+
+      <div className="form-row">
+        <h4>Value</h4>
+        <input
+          type="number"
+          value={singleData.value}
+          onChange={(e) =>
+            setSingleData({ ...singleData, value: e.target.value })
+          }
+          className="multipleitem"
+          placeholder="Enter value"
+        />
+      </div>
+    </div>
+  )}
+
+  {/* ---------- MULTIPLE MODE UI ---------- */}
+  {mode === "multiple" && (
+    <div style={{ marginTop: "20px" }}>
+      {/* Buttons */}
+      <div style={{ marginBottom: "15px" }}>
+        <button
+          type="button"
+          className="submitbtn"
+          onClick={addSlab}
+          style={{ marginRight: "10px" }}
+        >
+          + Add Slab
+        </button>
+
+        <button
+          type="button"
+          className="submitbtn"
+          onClick={addProductEntry}
+        >
+          + Add Product
+        </button>
+      </div>
+
+      {/* Render Multiple Cards */}
+      {multipleData.map((entry, index) => (
+        <div
+          key={index}
+          style={{
+            border: "1px solid #ccc",
+            padding: "15px",
+            borderRadius: "8px",
+            background: "white",
+            marginBottom: "20px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <h4>
+              {entry.mode === "slab" ? "Slab Entry" : "Product Entry"}
+            </h4>
+
+            <button
+              type="button"
+              onClick={() => removeEntry(index)}
+              style={{
+                background: "red",
+                color: "white",
+                border: "none",
+                padding: "3px 8px",
+                borderRadius: "6px",
+              }}
+            >
+              X
+            </button>
+          </div>
+
+          {/* Slab UI */}
+          {entry.mode === "slab" && (
+            <>
+              <div className="form-row">
+                <h4>From</h4>
+                <input
+                  type="number"
+                  className="multipleitem"
+                  value={entry.from}
+                  onChange={(e) =>
+                    updateEntry(index, "from", e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="form-row">
+                <h4>To</h4>
+                <input
+                  type="number"
+                  className="multipleitem"
+                  value={entry.to}
+                  onChange={(e) =>
+                    updateEntry(index, "to", e.target.value)
+                  }
+                />
+              </div>
+            </>
+          )}
+
+          {/* Product UI */}
+          {entry.mode === "product" && (
+            <div className="form-row">
+              <h4>Product / Service</h4>
+              <select
+                value={entry.itemName}
+                onChange={(e) =>
+                  updateEntry(index, "itemName", e.target.value)
+                }
+                className="multipleitem"
+              >
+                <option value="">Select Product / Service</option>
+
+                <optgroup label="Services">
+                  {services.map((s, i) => (
+                    <option key={`s-${i}`} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </optgroup>
+
+                <optgroup label="Products">
+                  {products.map((p, i) => (
+                    <option key={`p-${i}`} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          )}
+
+          {/* Common Fields */}
+          <div className="form-row">
+            <h4>Type</h4>
+            <select
+              value={entry.type}
+              onChange={(e) =>
+                updateEntry(index, "type", e.target.value)
+              }
+              className="multipleitem"
+            >
+              <option value="">Select</option>
+              <option value="percentage">Percentage (%)</option>
+              <option value="amount">Amount (Rs)</option>
+            </select>
+          </div>
+
+          <div className="form-row">
+            <h4>Value</h4>
+            <input
+              type="number"
+              className="multipleitem"
+              value={entry.value}
+              onChange={(e) =>
+                updateEntry(index, "value", e.target.value)
+              }
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {/* SUBMIT */}
+  <button
+    type="button"
+    onClick={handleSubmit}
+    className="submitbtn"
+    style={{ marginTop: "10px" }}
+  >
+    Submit
+  </button>
+</div>
+
+
 </>
+
 )}
+{activeTab === 'Payment' && (
+  <div>
+    <h3>Payment Tracking</h3>
+
+    <div className="form-row">
+      <h4>Category</h4>
+      <div className="multipleitem">
+        <input type="text" value={formData?.Category || ''} readOnly />
+      </div>
+    </div>
+
+    {/* Orbiter fee section (always shown to Orbiter; shown to Cosmo too because they must pay orbiter as part of journey) */}
+    <div style={{ border: '1px solid #ddd', padding: '12px', borderRadius: 8, marginBottom: 12 }}>
+      <h4>Orbiter Fee (₹1000)</h4>
+
+      <div className="form-row">
+        <h4>Fee Type</h4>
+        <div className="multipleitem">
+          <select
+            value={payment.orbiter.feeType || ''}
+            onChange={(e) => {
+              const ft = e.target.value;
+              setPayment((p) => ({
+                ...p,
+                orbiter: {
+                  ...p.orbiter,
+                  feeType: ft,
+                  amount: 1000,
+                  status: ft === 'adjustment' ? 'adjusted' : (p.orbiter.status === 'adjusted' ? 'unpaid' : p.orbiter.status),
+                  // clear payment details if switching to adjustment? keep them but validation will enforce
+                }
+              }));
+            }}
+          >
+            <option value="">Select Fee Type</option>
+            <option value="upfront">Upfront</option>
+            <option value="adjustment">Adjustment</option>
+          </select>
+        </div>
+      </div>
+
+      {payment.orbiter.feeType === 'upfront' && (
+        <>
+          <div className="form-row">
+            <h4>Paid?</h4>
+            <div className="multipleitem">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={payment.orbiter.status === 'paid'}
+                  onChange={(e) =>
+                    setPayment((p) => ({
+                      ...p,
+                      orbiter: {
+                        ...p.orbiter,
+                        status: e.target.checked ? 'paid' : 'unpaid',
+                        paidDate: e.target.checked ? (p.orbiter.paidDate || new Date().toISOString().slice(0, 10)) : ''
+                      }
+                    }))
+                  }
+                />{' '}
+                Paid
+              </label>
+            </div>
+          </div>
+
+          {payment.orbiter.status === 'paid' && (
+            <>
+              <div className="form-row">
+                <h4>Paid Date</h4>
+                <div className="multipleitem">
+                  <input
+                    type="date"
+                    value={payment.orbiter.paidDate || ''}
+                    onChange={(e) => setPayment((p) => ({ ...p, orbiter: { ...p.orbiter, paidDate: e.target.value } }))}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <h4>Payment Mode</h4>
+                <div className="multipleitem">
+                  <select
+                    value={payment.orbiter.paymentMode || ''}
+                    onChange={(e) => setPayment((p) => ({ ...p, orbiter: { ...p.orbiter, paymentMode: e.target.value } }))}
+                  >
+                    <option value="">Select Mode</option>
+                    {paymentModes.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <h4>Payment ID / Txn</h4>
+                <div className="multipleitem">
+                  <input
+                    type="text"
+                    value={payment.orbiter.paymentId || ''}
+                    onChange={(e) => setPayment((p) => ({ ...p, orbiter: { ...p.orbiter, paymentId: e.target.value } }))}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <h4>Payment Screenshot</h4>
+                <div className="multipleitem">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handlePaymentScreenshotChange('orbiter', e.target.files[0])}
+                  />
+                  {payment.orbiter.screenshotPreview && (
+                    <div style={{ marginTop: 8 }}>
+                      <img src={payment.orbiter.screenshotPreview} alt="orbiter-screenshot" style={{ width: 120, borderRadius: 6 }} />
+                      <div>
+                        <button type="button" onClick={() => clearPaymentScreenshot('orbiter')}>Clear</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {payment.orbiter.feeType === 'adjustment' && (
+        <div className="form-row">
+          <h4>Adjustment</h4>
+          <div className="multipleitem">
+            <input type="text" value="Adjustment applied (₹1000)" readOnly />
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* CosmOrbiter fee section: only relevant if Category === 'CosmOrbiter' */}
+    {formData?.Category === 'CosmOrbiter' && (
+      <div style={{ border: '1px solid #ddd', padding: '12px', borderRadius: 8 }}>
+        <h4>CosmOrbiter Fee (₹5000)</h4>
+
+        <div className="form-row">
+          <h4>Paid?</h4>
+          <div className="multipleitem">
+            <label>
+              <input
+                type="checkbox"
+                checked={payment.cosmo.status === 'paid'}
+                onChange={(e) =>
+                  setPayment((p) => ({
+                    ...p,
+                    cosmo: {
+                      ...p.cosmo,
+                      amount: 5000,
+                      status: e.target.checked ? 'paid' : 'unpaid',
+                      paidDate: e.target.checked ? (p.cosmo.paidDate || new Date().toISOString().slice(0, 10)) : ''
+                    }
+                  }))
+                }
+              />{' '}
+              Paid
+            </label>
+          </div>
+        </div>
+
+        {payment.cosmo.status === 'paid' && (
+          <>
+            <div className="form-row">
+              <h4>Paid Date</h4>
+              <div className="multipleitem">
+                <input
+                  type="date"
+                  value={payment.cosmo.paidDate || ''}
+                  onChange={(e) => setPayment((p) => ({ ...p, cosmo: { ...p.cosmo, paidDate: e.target.value } }))}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <h4>Payment Mode</h4>
+              <div className="multipleitem">
+                <select
+                  value={payment.cosmo.paymentMode || ''}
+                  onChange={(e) => setPayment((p) => ({ ...p, cosmo: { ...p.cosmo, paymentMode: e.target.value } }))}
+                >
+                  <option value="">Select Mode</option>
+                  {paymentModes.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <h4>Payment ID / Txn</h4>
+              <div className="multipleitem">
+                <input
+                  type="text"
+                  value={payment.cosmo.paymentId || ''}
+                  onChange={(e) => setPayment((p) => ({ ...p, cosmo: { ...p.cosmo, paymentId: e.target.value } }))}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <h4>Payment Screenshot</h4>
+              <div className="multipleitem">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handlePaymentScreenshotChange('cosmo', e.target.files[0])}
+                />
+                {payment.cosmo.screenshotPreview && (
+                  <div style={{ marginTop: 8 }}>
+                    <img src={payment.cosmo.screenshotPreview} alt="cosmo-screenshot" style={{ width: 120, borderRadius: 6 }} />
+                    <div>
+                      <button type="button" onClick={() => clearPaymentScreenshot('cosmo')}>Clear</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+        {formData.Category === 'CosmOrbiter' &&
+ payment.cosmo?.status === 'paid' && (
+  <>
+    {!formData.subscription?.startDate ? (
+      <button
+        onClick={handleBusinessApprove}
+        className="approve-btn"
+      >
+        Approve Business
+      </button>
+    ) : (
+      <p className="approved-status">
+        ✅ Business Approved on {formData.subscription.startDate}<br/>
+        🔄 Renew on {formData.subscription.nextRenewalDate}
+      </p>
+    )}
+  </>
+)}
+
+
+      </div>
+    )}
+  </div>
+)}
+{activeTab === "Payment" && (
+  <div className="payment-section">
+    <h3>Payment Details</h3>
+
+    
+
+    {/* ✅ Adjustment Logs for Orbiter */}
+    {formData.payment?.orbiter?.adjustmentLogs?.length > 0 && (
+      <div className="adjustment-section" style={{ marginTop: "30px" }}>
+        <h3>Adjustment Logs</h3>
+        <table
+          className="adjustment-table"
+          border="1"
+          cellPadding="8"
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            background: "#fff",
+            borderRadius: "8px",
+            overflow: "hidden",
+          }}
+        >
+          <thead style={{ backgroundColor: "#f3f3f3" }}>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Received Amount (₹)</th>
+              <th>Remaining Amount (₹)</th>
+              <th>Payment Mode</th>
+              <th>Transaction Ref</th>
+              <th>Referral ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {formData.payment.orbiter.adjustmentLogs.map((log, index) => (
+              <tr key={index}>
+                <td>{index + 1}</td>
+                <td>{new Date(log.date).toLocaleString()}</td>
+                <td>{log.receivedAmount || "-"}</td>
+                <td>{log.remainingAmount || "-"}</td>
+                <td>{log.paymentMode || "-"}</td>
+                <td>{log.transactionRef || "-"}</td>
+                <td>{log.referralId || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+)}
+
+
 
         {/* --- OTHER TABS: HEALTH, EDUCATION, ETC. --- */}
        {activeTab && (

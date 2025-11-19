@@ -107,9 +107,13 @@ const ReferralDetails = () => {
         <h3 className="referralCardTitle">Referral Information</h3>
         <div className="referralCardBody">
           <p><span>Referral ID:</span> {referral.referralId || "N/A"}</p>
-          <p><span>Deal Status:</span> {referral.dealStatus || "N/A"}</p>
+          <p><span>Deal Status:</span> { referral.cosmoOrbiter?.dealStatus || "N/A"}</p>
           <p><span>Type:</span> {referral.referralType || "N/A"}</p>
-      
+          <p><span>Source:</span> {referral.referralSource || "N/A"}</p>
+          <p><span>Last Updated:</span> {referral.lastUpdated?.toDate
+            ? referral.lastUpdated.toDate().toLocaleString()
+            : "N/A"}
+          </p>
         </div>
       </div>
     )}
@@ -150,7 +154,7 @@ const ReferralDetails = () => {
         <div className="referralCardBody">
           <p><span>Name:</span> {referral.product?.name || referral.service?.name || "N/A"}</p>
           <p><span>Description:</span> {referral.leadDescription || "N/A"}</p>
-          <p><span>Percentage:</span> {referral.product?.percentage || referral.service?.percentage || "N/A"}%</p>
+          <p><span>Percentage:</span> {referral.product?.percentage || referral.service?.percentage || "N/A"}</p>
 
           {referral.product?.imageURL && (
             <div className="referralImageBox">

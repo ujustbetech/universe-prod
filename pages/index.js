@@ -24,72 +24,76 @@ const HomePage = () => {
   const [upcomingMonthlyMeet, setUpcomingMonthlyMeet] = useState(null);
   const [upcomingNTMeet, setUpcomingNTMeet] = useState(null);
 
-  // ✅ Fetch user info from localStorage thi for deployment
-  useEffect(() => {
-    const storedPhone = localStorage.getItem('mmOrbiter');
-    if (storedPhone) {
-      setPhoneNumber(storedPhone);
-      setIsLoggedIn(true);
-      fetchUserName(storedPhone);
-      setLoading(false);
-    } else {
-      setLoading(false);
-    }
-  }, []);
+// ✅ Fetch user info after reload
+useEffect(() => {
+  const storedUjb = localStorage.getItem('mmUJBCode');
+  const storedPhone = localStorage.getItem('mmOrbiter');
 
-  const fetchUserName = async (phone) => {
-    try {
-      const userRef = doc(db, COLLECTIONS.userDetail, phone);
-      const userDoc = await getDoc(userRef);
-      const name = userDoc.exists() ? userDoc.data()[" Name"] || 'User' : 'User';
+  if (storedUjb && storedPhone) {
+    setPhoneNumber(storedPhone);
+     
+    setIsLoggedIn(true);
+    fetchUserName(storedUjb);
+  }
+  setLoading(false);
+}, []);
+
+// ✅ Fetch data using UJBCode as Doc ID
+const fetchUserName = async (ujbCode) => {
+  try {
+    const userRef = doc(db, COLLECTIONS.userDetail, ujbCode);
+    const userDoc = await getDoc(userRef);
+
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      const name = data["Name"] || data[" Name"] || 'User';
       setUserName(name);
       return name;
-    } catch (err) {
-      console.error(err);
-      return 'User';
     }
-  };
+    return 'User';
+  } catch (err) {
+    console.error(err);
+    return 'User';
+  }
+};
 
-  // ✅ Handle login
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    try {
-      const docRef = doc(db, COLLECTIONS.userDetail, phoneNumber);
-      const docSnap = await getDoc(docRef);
+// ✅ Login → Fetch UJB from matching phone → then login
+const handleLogin = async (e) => {
+  e.preventDefault();
+  try {
+    const usersSnapshot = await getDocs(collection(db, COLLECTIONS.userDetail));
+    let matchedDoc = null;
 
-      if (docSnap.exists()) {
-        localStorage.setItem('mmOrbiter', phoneNumber);
-        setIsLoggedIn(true);
-        const fetchedName = docSnap.data()[" Name"] || 'User';
-        setUserName(fetchedName);
-        logUserLogin(phoneNumber, fetchedName);
-      } else {
-        setError('You are not an Orbiter.');
+    usersSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data["MobileNo"] === phoneNumber) {
+        matchedDoc = { id: doc.id, ...data };
       }
-    } catch (err) {
-      console.error(err);
-      setError('Login failed. Please try again.');
-    }
-  };
+    });
 
-  // ✅ Log login events
-  const logUserLogin = async (phone, name) => {
-    try {
-      const res = await fetch('https://api.ipify.org?format=json');
-      const data = await res.json();
-      const deviceInfo = navigator.userAgent;
+    if (matchedDoc) {
+      const fetchedName = matchedDoc["Name"] || matchedDoc[" Name"] || 'User';
+      const fetchedUJBCode = matchedDoc.id; // ✅ Doc ID
 
-      await setDoc(doc(collection(db, 'LoginLogs')), {
-        phoneNumber: phone,
-        name: name || 'Unknown',
-        loginTime: new Date(),
-        deviceInfo,
-        ipAddress: data.ip || 'Unknown',
-      });
-    } catch (err) {
-      console.warn("Could not log login:", err);
+      // ✅ Store in localStorage
+      localStorage.setItem('mmOrbiter', phoneNumber);
+      localStorage.setItem('mmUJBCode', fetchedUJBCode);
+
+      setUserName(fetchedName);
+      setIsLoggedIn(true);
+
+      logUserLogin(phoneNumber, fetchedName);
+    } else {
+      setError("You are not an Orbiter.");
     }
-  };
+
+  } catch (err) {
+    console.error(err);
+    setError("Login failed. Please try again.");
+  }
+};
+
+  
 
   // ✅ Fetch upcoming events and counts
   useEffect(() => {
@@ -103,14 +107,13 @@ const HomePage = () => {
         ...doc.data(),
         time: doc.data().time?.toDate?.() || new Date(0)
       }));
-      setMonthlyMetCount(monthlySnapshot.size);
+    
       const futureMonthly = monthlyEvents.filter(e => e.time > now).sort((a, b) => a.time - b.time);
       setUpcomingMonthlyMeet(futureMonthly[0] || null);
 
       // Conclaves & NT Meetings
       const conclaveSnapshot = await getDocs(collection(db, COLLECTIONS.conclaves));
-      setNtMeetCount(conclaveSnapshot.size);
-
+     
       let allNTMeetings = [];
       for (const conclaveDoc of conclaveSnapshot.docs) {
         const meetingsSnapshot = await getDocs(collection(db, COLLECTIONS.conclaves, conclaveDoc.id, "meetings"));
@@ -124,6 +127,38 @@ const HomePage = () => {
 
     fetchData();
   }, []);
+// ✅ Referral Count Logic
+useEffect(() => {
+  const fetchReferralData = async () => {
+    const storedUjb = localStorage.getItem('mmUJBCode');
+    if (!storedUjb) return;
+
+    const referralSnap = await getDocs(collection(db, "Referraldev"));
+
+    let myReferral = 0;
+    let passedReferral = 0;
+
+    referralSnap.forEach(doc => {
+      const data = doc.data();
+
+      // ✅ My Referral → logged-in user's UJB is inside cosmoOrbiter
+      if (data.cosmoOrbiter?.ujbCode === storedUjb) {
+        myReferral++;
+      }
+
+      // ✅ Passed Referral → logged-in user's UJB is inside orbiter
+      if (data.orbiter?.ujbCode === storedUjb) {
+        passedReferral++;
+      }
+    });
+
+    setNtMeetCount(myReferral);        // ✅ My Referral
+    setMonthlyMetCount(passedReferral); // ✅ Passed Referral
+  };
+
+  fetchReferralData();
+}, []);
+
 
   if (!isLoggedIn) {
     return (
@@ -167,12 +202,20 @@ const HomePage = () => {
           <SummaryCard  className="completed" count={monthlyMetCount} label="Passed Referrals" href="/PassedReferrals" />
         </section>
 
-        <section className="upcoming-events">
-          <h2>Upcoming Events</h2>
-          {upcomingMonthlyMeet && <MeetingCard meeting={upcomingMonthlyMeet} type="monthly" />}
-          {upcomingNTMeet && <MeetingCard meeting={upcomingNTMeet} type="nt" />}
-          {!upcomingMonthlyMeet && !upcomingNTMeet && <p className="noMeetings">No upcoming meetings</p>}
-        </section>
+  {(upcomingMonthlyMeet || upcomingNTMeet) && (
+  <section className="upcoming-events">
+    <h2>Upcoming Events</h2>
+
+    {upcomingMonthlyMeet && (
+      <MeetingCard meeting={upcomingMonthlyMeet} type="monthly" />
+    )}
+
+    {upcomingNTMeet && (
+      <MeetingCard meeting={upcomingNTMeet} type="nt" />
+    )}
+  </section>
+)}
+
 
         <AllServicesProducts pageHeading="Top Services & Products" hideFilters={true} enableInfiniteScroll={false} maxItems={12} hideHeaderFooter={true} extraSectionClass="homepage-preview" />
 

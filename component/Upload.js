@@ -1,123 +1,115 @@
-import React, { useRef } from "react";
-import { db } from "../firebaseConfig";
-import { collection, doc, setDoc, Timestamp } from "firebase/firestore";
+import React, { useState } from "react";
 import * as XLSX from "xlsx";
+import { db } from "../firebaseConfig";
+import { doc, setDoc } from "firebase/firestore";
 
-export default function ImportReferrals() {
-  const fileInputRef = useRef();
+const UploadUserDetails = () => {
+  const [excelData, setExcelData] = useState(null);
 
-  const handleFileSelect = () => fileInputRef.current.click();
+  // ✅ Handle Excel File Upload
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    const reader = new FileReader();
 
-  // Function to safely parse Excel date values
-  const parseExcelDate = (value) => {
-    if (!value) return Timestamp.now();
-
-    // If it's already a Date object
-    if (value instanceof Date && !isNaN(value)) return Timestamp.fromDate(value);
-
-    // If it's a number (Excel serial date)
-    if (typeof value === "number") {
-      const excelEpoch = new Date(1899, 11, 30);
-      return Timestamp.fromDate(new Date(excelEpoch.getTime() + value * 86400000));
-    }
-
-    // If it's a string
-    const parsed = new Date(value);
-    if (!isNaN(parsed)) return Timestamp.fromDate(parsed);
-
-    // Fallback to now
-    return Timestamp.now();
-  };
-
-  const handleImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    try {
-      const data = await file.arrayBuffer();
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: "array" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
 
-      if (!jsonData.length) {
-        alert("⚠️ Excel sheet is empty!");
-        return;
+      console.log("Parsed Excel Data:", jsonData);
+      setExcelData(jsonData);
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  // ✅ Upload Parsed Data to Firestore
+  const uploadDataToFirestore = async () => {
+    if (!excelData) {
+      alert("⚠️ Please upload a file first.");
+      return;
+    }
+
+    try {
+      for (const row of excelData) {
+        const ujbCode = String(row["UJB Code"] || "").trim();
+        const orbiterName = String(row["Orbiter Name"] || "").trim();
+        const mobileNumber = String(row["Mobile Number"] || "").trim();
+        const oneTimeFee = Number(row["One time enrollment fees"] || 0);
+        const balanceAmount = Number(row[" Balance Amount "] || 0);
+
+        if (!ujbCode) {
+          console.warn("Skipping row due to missing UJB Code:", row);
+          continue;
+        }
+
+        const docRef = doc(db, "usersdetail", ujbCode);
+
+        // ✅ Firestore Data Structure
+        const userData = {
+          ujbCode,
+          orbiterName,
+          mobileNumber,
+          oneTimeEnrollmentFee: oneTimeFee,
+          balanceAmount,
+          payment: {
+            orbiter: {
+              amount: balanceAmount, // 👈 comes from Balance Amount
+              feeType: "adjustment",
+              paidDate: "",
+              paymentId: "",
+              paymentMode: "",
+              screenshotURL: "",
+              status: "adjusted",
+            },
+          },
+        };
+
+        await setDoc(docRef, userData, { merge: true });
+        console.log(`✅ Uploaded: ${ujbCode}`);
       }
 
-      let importedCount = 0;
-
-      for (const row of jsonData) {
-        const referralGivenDate = parseExcelDate(row["Referral Given date"]);
-
-        // CosmoOrbiter map
-        const cosmoOrbiter = {
-          name: row["CosmOrbiter Name"] || "",
-          email: row["CosmOrbiter personal  Email"] || "",
-          phone: (row["CosmOrbiter  Mobile number"] || "").toString(),
-          mentorName: row["CosmOrbiter mentorbiter Name"] || null,
-          mentorEmail: row["CosmOrbiter MentOrbiter Email ID"] || null,
-          mentorPhone: row["CosmOrbiter MentOrbiter Contact No"] || null,
-          dealStatus: row["Referral/Deal Status"] || "Pending",
-          lastUpdated: Timestamp.now(),
-        };
-
-        // Orbiter map
-        const orbiter = {
-          name: row["Orbiter Name"] || "",
-          email: row["Orbiter Email"] || "",
-          phone: (row["Orbiter Mobile number"] || "").toString().replace("+91", "").trim(),
-          ujbCode: row["Orbiter_ujbCode"] || "",
-          mentorName: row["Orbiter MentOrbiter Name"] || null,
-          mentorEmail: row["Orbiter MentOrbiter Email"] || null,
-          mentorPhone: row["Orbiter MentOrbiter Mobile number"] || null,
-          orbitersInfo: null,
-        };
-
-        // Product/service map
-        const product = {
-          name: row["Product/Service Name"] || "",
-          description: row["Product Description"] || "",
-          imageURL: row["Product Image URL"] || "",
-          percentage: row["Agreed Percentage/ amount"] || "",
-        };
-
-        // Main referral document
-        const referralDoc = {
-          referralId: row["Referral Id"] || "",
-          referralSource: row["referralSource"] || "",
-          referralType: row["referralType"] || "Self",
-          timestamp: referralGivenDate,
-          cosmoOrbiter,
-          orbiter,
-          product,
-        };
-
-        // Save with auto-generated doc ID in Referral_dev
-        const docRef = doc(collection(db, "Referraldev"));
-        await setDoc(docRef, referralDoc);
-        importedCount++;
-      }
-
-      alert(`✅ ${importedCount} referrals imported successfully!`);
+      alert("🎉 All user details uploaded successfully!");
     } catch (error) {
-      console.error("❌ Error importing referrals:", error);
-      alert("❌ Failed to import referrals. Check console.");
+      console.error("❌ Error uploading data:", error);
+      alert("Error uploading data. Check console for details.");
     }
   };
 
   return (
-    <div>
-      <button onClick={handleFileSelect} className="m-button-5">
-        Choose Excel File to Import
+    <section className="c-form box">
+      <h2>Upload User Details (UJB Data)</h2>
+      <button className="m-button-5" onClick={() => window.history.back()}>
+        Back
       </button>
-      <input
-        type="file"
-        accept=".xlsx, .xls"
-        ref={fileInputRef}
-        onChange={handleImport}
-        style={{ display: "none" }}
-      />
-    </div>
+
+      <ul>
+        <div className="upload-container">
+          <input
+            type="file"
+            id="fileUpload"
+            className="file-input"
+            onChange={handleFileUpload}
+            accept=".xlsx, .xls"
+          />
+        </div>
+
+        <li className="form-row">
+          <div>
+            <button
+              className="m-button-7"
+              onClick={uploadDataToFirestore}
+              style={{ backgroundColor: "#007bff", color: "white" }}
+            >
+              Upload to Firestore
+            </button>
+          </div>
+        </li>
+      </ul>
+    </section>
   );
-}
+};
+
+export default UploadUserDetails;
