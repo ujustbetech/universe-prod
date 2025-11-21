@@ -75,8 +75,16 @@ useEffect(() => {
           email: data.Email || "",
           phone: data["MobileNo"] || "",
           ujbCode: data["UJBCode"] || "",
-          mentorName: data["MentorName"] || "",
-          mentorPhone: data["MentorPhone"] || "",
+       mentorName:
+  data["MentorName"] ||
+  data["Mentor Name"] ||
+  "",
+
+mentorPhone:
+  data["MentorPhone"] ||
+  data["Mentor Phone"] ||
+  "",
+
         });
       }
     } catch (err) {
@@ -102,7 +110,7 @@ useEffect(() => {
           email: data.Email || "",
           phone: data["MobileNo"] || "",
           businessName: data["BusinessName"] || "N/A",
-          businessDetails: data["BusinessDetails"] || "N/A", // fixed field name
+          businessDetails: data["BusinessHistory"] || "N/A", // fixed field name
           tagline: data["TagLine"] || "",
           logo: data["Business Logo"] || "",
           profilePic: data["ProfilePhotoURL"] || "",
@@ -184,8 +192,7 @@ const handlePassReferral = async () => {
 
     const selectedService = services.find((s) => s.name === selectedOption) || null;
     const selectedProduct = products.find((p) => p.name === selectedOption) || null;
-
-   const data = {
+const data = {
   referralId,
   referralSource: "R",
   referralType: selectedFor === "self" ? "Self" : "Others",
@@ -193,7 +200,9 @@ const handlePassReferral = async () => {
   dealStatus: "Pending",
   lastUpdated: new Date(),
   timestamp: new Date(),
-  cosmoUjbCode: userDetails.ujbCode, // ✅ added field
+
+  cosmoUjbCode: userDetails.ujbCode,
+
   cosmoOrbiter: {
     name: userDetails.name,
     email: userDetails.email,
@@ -202,10 +211,22 @@ const handlePassReferral = async () => {
     mentorName: userDetails.mentorName || null,
     mentorPhone: userDetails.mentorPhone || null,
   },
+
+  // ✅ UPDATED: mentor info added here
   orbiter:
     selectedFor === "self"
-      ? orbiterDetails
-      : { name: otherName, phone: otherPhone, email: otherEmail },
+      ? {
+          ...orbiterDetails,
+          mentorName: orbiterDetails?.mentorName || null,
+          mentorPhone: orbiterDetails?.mentorPhone || null,
+        }
+      : {
+          name: otherName,
+          phone: otherPhone,
+          email: otherEmail,
+  
+        },
+
   product: selectedProduct
     ? {
         name: selectedProduct.name,
@@ -214,6 +235,7 @@ const handlePassReferral = async () => {
         percentage: selectedProduct.percentage || "0",
       }
     : null,
+
   service: selectedService
     ? {
         name: selectedService.name,
@@ -222,10 +244,12 @@ const handlePassReferral = async () => {
         percentage: selectedService.percentage || "0",
       }
     : null,
+
   dealLogs: [],
   followups: [],
   statusLogs: [],
 };
+
 
     await addDoc(collection(db,COLLECTIONS.referral), data);
 
@@ -455,10 +479,10 @@ const sendWhatsAppMessage = async (phone, parameters = []) => {
 
               <div className='eventinnerContent'>
                 {/* About Section */}
-                {activeTab === "about" && (
+                  {activeTab === "about" && (
                   <div className="tabs about-section">
                     <div>
-                      <p>{userDetails.businessDetails || null}</p>
+                      <p>{userDetails.businessDetails || "not availablr"}</p>
                     </div>
                     <div>
                       {userDetails.tagline || "Tagline not available"}
@@ -466,7 +490,6 @@ const sendWhatsAppMessage = async (phone, parameters = []) => {
 
                   </div>
                 )}
-
                 {servicesLoaded && (
                   <div style={{ display: activeTab === "services" ? "block" : "none" }}>
                     {services.length > 0 ? (
