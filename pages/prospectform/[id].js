@@ -3,8 +3,10 @@ import { db } from "../../firebaseConfig";
 import { collection, addDoc, doc, getDoc } from "firebase/firestore";
 import Swal from "sweetalert2";
 import "../../src/app/styles/main.scss";
+import { COLLECTIONS } from "/utility_collection";
 import "../../pages/feedback.css";
 import { useRouter } from "next/router";
+import HeaderNav from "../../component/HeaderNav";
 
 
 
@@ -355,7 +357,7 @@ const ProspectForm = () => {
  </div>
  
       <h2 className="footers">Copyright @2025 | Powered by UJustBe</h2>
-      
+      <HeaderNav/>
     </section>
   );
 };

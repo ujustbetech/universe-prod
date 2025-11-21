@@ -2,12 +2,14 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseConfig";
 import Link from 'next/link'
+import { COLLECTIONS } from "/utility_collection";
 import { useRouter } from "next/router";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import "../src/app/styles/user.scss";
 import HeaderNav from "../component/HeaderNav";
 
 const UserProspects = () => {
+  const router = useRouter();
   const [prospects, setProspects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userPhone, setUserPhone] = useState("");

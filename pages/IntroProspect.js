@@ -5,6 +5,7 @@ import "../src/app/styles/user.scss"; // SAME UI STYLE AS REFERRAL PAGE
 import Swal from "sweetalert2";
 import axios from "axios";
 import "../pages/feedback.css";
+import { COLLECTIONS } from "/utility_collection";
 import emailjs from "@emailjs/browser";
 import HeaderNav from "../component/HeaderNav";
 
@@ -306,7 +307,7 @@ Form Link: ${formLink}
         <h2 className="footers">Copyright @2025 | Powered by UJustBe</h2>
 
       </div>
-      <HeaderNav/>
+    <HeaderNav/>
     </section>
   </main>
 </>
